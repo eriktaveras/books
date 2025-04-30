@@ -1,12 +1,38 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.urls import reverse
+from django.utils import timezone
 from .models import Book, DeweyCode
 from .forms import BookForm, DeweyCodeForm, SearchForm
 
 def index(request):
-    return render(request, 'libros/index.html')
+    # Get statistics for the index page
+    book_count = Book.objects.count()
+    dewey_count = DeweyCode.objects.count()
+    
+    # Buscar libros disponibles con búsqueda insensible a mayúsculas/minúsculas
+    # y considerando múltiples posibles valores para "disponible"
+    available_count = Book.objects.filter(
+        Q(status__iexact='disponible') | 
+        Q(status__iexact='disponibles') |
+        Q(status__iexact='available')
+    ).count()
+    
+    stats = {
+        'book_count': book_count,
+        'dewey_count': dewey_count,
+        'updated_date': timezone.now().strftime('%Y')
+    }
+    
+    # Calculate availability percentage if there are books
+    if book_count > 0:
+        availability_percentage = round((available_count / book_count) * 100)
+        stats['available_count'] = f"{availability_percentage}%"
+    else:
+        stats['available_count'] = "0%"
+    
+    return render(request, 'libros/index.html', stats)
 
 def book_list(request):
     form = SearchForm(request.GET)
@@ -205,3 +231,46 @@ def dewey_update(request, pk):
         'title': 'Editar Código Dewey',
         'dewey': dewey
     })
+
+def search_suggestions_api(request):
+    query = request.GET.get('query', '')
+    
+    if len(query) < 2:
+        return JsonResponse({'suggestions': []})
+    
+    # Get book suggestions
+    book_suggestions = Book.objects.filter(
+        Q(title__icontains=query) | 
+        Q(author__icontains=query) |
+        Q(isbn__icontains=query)
+    ).values('title', 'author', 'pk')[:5]  # Limit to 5 results
+    
+    # Get category suggestions
+    category_suggestions = DeweyCode.objects.filter(
+        Q(code__icontains=query) | 
+        Q(description__icontains=query)
+    ).values('code', 'description', 'pk')[:3]  # Limit to 3 results
+    
+    # Format data for response
+    formatted_books = [
+        {
+            'type': 'book',
+            'title': book['title'],
+            'author': book['author'],
+            'url': reverse('book_detail', args=[book['pk']])
+        } for book in book_suggestions
+    ]
+    
+    formatted_categories = [
+        {
+            'type': 'category',
+            'code': category['code'],
+            'description': category['description'],
+            'url': reverse('book_list') + f"?field=dewey_code&query={category['code']}"
+        } for category in category_suggestions
+    ]
+    
+    # Combined results
+    suggestions = formatted_books + formatted_categories
+    
+    return JsonResponse({'suggestions': suggestions})

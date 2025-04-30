@@ -5,6 +5,7 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('libros/', views.book_list, name='book_list'),
     path('api/libros/', views.book_api, name='book_api'),
+    path('api/search-suggestions/', views.search_suggestions_api, name='search_suggestions_api'),
     path('libros/nuevo/', views.book_create, name='book_create'),
     path('libros/<int:pk>/', views.book_detail, name='book_detail'),
     path('libros/<int:pk>/editar/', views.book_update, name='book_update'),
