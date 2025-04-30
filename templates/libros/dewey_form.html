@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Biblioteca BCF{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-center">
+    <h1 class="text-3xl font-medium tracking-tight mb-4 md:mb-0">{{ title }}</h1>
+    <div>
+        <a href="{% url 'dewey_list' %}" class="btn bg-light-gray text-black hover:bg-gray hover:text-white inline-flex items-center">
+            <i class="fas fa-times mr-2"></i> CANCELAR
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <div>
+                <label for="{{ form.code.id_for_label }}" class="block font-medium mb-2 uppercase tracking-wide text-sm">CÓDIGO</label>
+                {{ form.code }}
+                {% if form.code.errors %}
+                    <div class="text-red-600 text-sm mt-2 font-medium">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        {{ form.code.errors.0 }}
+                    </div>
+                {% endif %}
+                <p class="text-gray text-sm mt-2">Ingrese un código numérico en formato Dewey (ej: 001.12)</p>
+            </div>
+            <div>
+                <label for="{{ form.description.id_for_label }}" class="block font-medium mb-2 uppercase tracking-wide text-sm">DESCRIPCIÓN</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <div class="text-red-600 text-sm mt-2 font-medium">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        {{ form.description.errors.0 }}
+                    </div>
+                {% endif %}
+                <p class="text-gray text-sm mt-2">Describa el área temática correspondiente a este código</p>
+            </div>
+        </div>
+        
+        <div class="mt-10 text-right">
+            <button type="submit" class="btn btn-primary inline-flex items-center">
+                <i class="fas fa-save mr-2"></i> GUARDAR
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}Biblioteca BCF - Libros{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-center">
+    <h1 class="text-3xl font-medium tracking-tight mb-4 md:mb-0">LIBROS</h1>
+    <a href="{% url 'book_create' %}" class="btn btn-primary inline-flex items-center">
+        <i class="fas fa-plus mr-2"></i> AGREGAR LIBRO
+    </a>
+</div>
+
+<!-- Versión para escritorio -->
+<div class="hidden md:block overflow-x-auto">
+    <table id="booksTable" class="w-full mt-8 display">
+        <thead>
+            <tr>
+                <th class="w-2/5">TÍTULO</th>
+                <th class="w-1/5">AUTOR</th>
+                <th class="w-1/5">CÓDIGO DEWEY</th>
+                <th class="w-1/5">ESTADO</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Los datos se cargarán desde el servidor -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Versión para móvil -->
+<div class="md:hidden mt-4">
+    <!-- Controles de búsqueda y paginación para móvil -->
+    <div class="mb-5 card p-4">
+        <div class="mb-3">
+            <label for="mobileSearch" class="block text-sm font-medium text-gray mb-1">Buscar:</label>
+            <div class="relative">
+                <input id="mobileSearch" type="text" class="w-full py-2 px-4 pr-10 border border-black rounded-md" placeholder="Buscar libros...">
+                <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <i class="fas fa-search text-gray"></i>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <label for="mobileLimit" class="block text-sm font-medium text-gray mb-1">Mostrar:</label>
+                <select id="mobileLimit" class="py-1 px-2 border border-black rounded-md">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div id="mobileInfo" class="text-sm text-gray">
+                <!-- Info se actualizará vía JS -->
+                Cargando...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lista de libros para móvil -->
+    <div id="mobileBookList" class="space-y-3">
+        <!-- Los datos para móvil se cargarán con JavaScript -->
+        <div class="text-center py-4">
+            <i class="fas fa-spinner fa-spin text-2xl"></i>
+            <p class="mt-2">Cargando libros...</p>
+        </div>
+    </div>
+    
+    <!-- Paginación móvil -->
+    <div class="mt-5 flex flex-col items-center">
+        <div class="flex justify-center items-center gap-2 mb-3">
+            <button id="mobileFirst" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-double-left"></i>
+            </button>
+            <button id="mobilePrev" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-left"></i>
+            </button>
+            <span id="mobileCurrentPage" class="px-3 py-2 bg-black text-white rounded-md">1</span>
+            <button id="mobileNext" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-right"></i>
+            </button>
+            <button id="mobileLast" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-double-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        var currentPage = 0;
+        var totalPages = 0;
+        var searchTerm = '';
+        var limit = 10;
+        var mobileData = [];
+        var totalRecords = 0;
+        var filteredRecords = 0;
+        
+        // Inicializar DataTables con carga asíncrona
+        var table = $('#booksTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: "{% url 'book_api' %}",
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-3x"></i><div class="mt-2">Cargando...</div>'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            order: [[0, 'asc']],
+            columns: [
+                { 
+                    data: 'title',
+                    render: function(data, type, row) {
+                        if (type === 'display') {
+                            return '<a href="' + row.url + '" class="font-medium hover:underline">' + data + '</a>';
+                        }
+                        return data;
+                    }
+                },
+                { data: 'author' },
+                { data: 'dewey_code' },
+                { data: 'status' }
+            ],
+            drawCallback: function(settings) {
+                // Actualizar vista móvil con datos
+                updateMobileView(settings.json);
+            }
+        });
+        
+        // Función para actualizar la vista móvil con los datos recibidos
+        function updateMobileView(json) {
+            mobileData = json.data;
+            totalRecords = json.recordsTotal;
+            filteredRecords = json.recordsFiltered;
+            totalPages = Math.ceil(filteredRecords / limit);
+            
+            // Actualizar información de registros
+            updateMobileInfo();
+            
+            // Actualizar la paginación
+            updateMobilePagination();
+            
+            // Renderizar las tarjetas
+            renderMobileCards();
+        }
+        
+        // Función para actualizar información de registros
+        function updateMobileInfo() {
+            var start = currentPage * limit + 1;
+            var end = Math.min((currentPage + 1) * limit, filteredRecords);
+            
+            if (filteredRecords === 0) {
+                start = 0;
+                end = 0;
+            }
+            
+            $('#mobileInfo').text('Mostrando ' + start + ' a ' + end + ' de ' + filteredRecords + ' registros');
+        }
+        
+        // Función para actualizar los controles de paginación
+        function updateMobilePagination() {
+            $('#mobileCurrentPage').text(currentPage + 1);
+            
+            // Habilitar/deshabilitar botones según la página actual
+            $('#mobileFirst, #mobilePrev').prop('disabled', currentPage === 0);
+            $('#mobileNext, #mobileLast').prop('disabled', currentPage >= totalPages - 1 || totalPages === 0);
+        }
+        
+        // Función para renderizar tarjetas móviles
+        function renderMobileCards() {
+            var mobileList = $('#mobileBookList');
+            mobileList.empty();
+            
+            if (mobileData.length === 0) {
+                mobileList.html('<div class="card p-4"><p class="text-center">No se encontraron libros.</p></div>');
+                return;
+            }
+            
+            $.each(mobileData, function(i, book) {
+                var card = $('<a>').attr('href', book.url).addClass('block');
+                var cardContent = $('<div>').addClass('card p-4 hover:shadow-md transition-shadow duration-200');
+                
+                cardContent.append($('<h3>').addClass('font-medium text-lg mb-2 leading-tight').text(book.title));
+                
+                var authorDiv = $('<div>').addClass('text-gray text-sm mb-1');
+                authorDiv.append($('<span>').addClass('inline-block w-20').text('Autor:'));
+                authorDiv.append(' ' + book.author);
+                
+                var deweyDiv = $('<div>').addClass('text-gray text-sm mb-1');
+                deweyDiv.append($('<span>').addClass('inline-block w-20').text('Dewey:'));
+                deweyDiv.append(' ' + book.dewey_code);
+                
+                var statusDiv = $('<div>').addClass('text-gray text-sm mb-1');
+                statusDiv.append($('<span>').addClass('inline-block w-20').text('Estado:'));
+                statusDiv.append($('<span>').addClass('bg-black text-white px-2 py-0.5 text-xs').text(book.status));
+                
+                var editDiv = $('<div>').addClass('flex justify-end mt-2');
+                editDiv.append($('<span>').addClass('text-black text-xs').html('<i class="fas fa-edit"></i> Editar'));
+                
+                cardContent.append(authorDiv, deweyDiv, statusDiv, editDiv);
+                card.append(cardContent);
+                mobileList.append(card);
+            });
+        }
+        
+        // Eventos para controles móviles
+        $('#mobileSearch').on('keyup', function(e) {
+            searchTerm = $(this).val();
+            currentPage = 0; // Resetear a primera página
+            
+            // Si se presiona Enter, forzar búsqueda
+            if (e.keyCode === 13) {
+                loadMobileData();
+            }
+            
+            // Si se borra todo, también buscar
+            if (searchTerm === '') {
+                loadMobileData();
+            }
+            
+            // Debounce para no hacer muchas peticiones
+            clearTimeout($(this).data('timer'));
+            $(this).data('timer', setTimeout(function() {
+                loadMobileData();
+            }, 500));
+        });
+        
+        $('#mobileLimit').on('change', function() {
+            limit = parseInt($(this).val());
+            currentPage = 0; // Resetear a primera página
+            loadMobileData();
+        });
+        
+        // Botones de paginación
+        $('#mobileFirst').on('click', function() {
+            if (currentPage > 0) {
+                currentPage = 0;
+                loadMobileData();
+            }
+        });
+        
+        $('#mobilePrev').on('click', function() {
+            if (currentPage > 0) {
+                currentPage--;
+                loadMobileData();
+            }
+        });
+        
+        $('#mobileNext').on('click', function() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                loadMobileData();
+            }
+        });
+        
+        $('#mobileLast').on('click', function() {
+            if (currentPage < totalPages - 1) {
+                currentPage = totalPages - 1;
+                loadMobileData();
+            }
+        });
+        
+        // Función para cargar datos en móvil
+        function loadMobileData() {
+            var mobileList = $('#mobileBookList');
+            
+            // Mostrar spinner de carga
+            mobileList.html('<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="mt-2">Cargando libros...</p></div>');
+            
+            // Hacer petición a API
+            $.ajax({
+                url: "{% url 'book_api' %}",
+                data: {
+                    draw: new Date().getTime(),
+                    start: currentPage * limit,
+                    length: limit,
+                    'search[value]': searchTerm,
+                    order: JSON.stringify([{ column: 0, dir: 'asc' }])
+                },
+                dataType: 'json',
+                success: function(json) {
+                    updateMobileView(json);
+                },
+                error: function() {
+                    mobileList.html('<div class="card p-4"><p class="text-center text-red-600">Error al cargar los datos. Intente nuevamente.</p></div>');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %} 

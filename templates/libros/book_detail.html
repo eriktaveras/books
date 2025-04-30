@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ book.title }} - Biblioteca BCF{% endblock %}
+
+{% block content %}
+<!-- Cabecera con botones de acción -->
+<div class="mb-6 flex flex-col md:flex-row md:justify-between md:items-start">
+    <div class="mb-4 md:mb-0">
+        <a href="{% url 'book_list' %}" class="text-gray hover:text-black transition-colors inline-flex items-center mb-3">
+            <i class="fas fa-arrow-left mr-2"></i> Volver a la lista
+        </a>
+        <h1 class="text-2xl md:text-3xl font-medium tracking-tight leading-tight">{{ book.title }}</h1>
+        <p class="text-gray mt-2 text-base md:text-lg">{{ book.author }}</p>
+    </div>
+    <div class="flex space-x-3 mt-2 md:mt-0">
+        <a href="{% url 'book_update' book.pk %}" class="btn btn-primary inline-flex items-center py-2 px-4 md:py-3 md:px-6">
+            <i class="fas fa-edit mr-2"></i> EDITAR
+        </a>
+    </div>
+</div>
+
+<!-- Contenido principal en formato responsive -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+    <!-- Columna principal para detalles del libro -->
+    <div class="lg:col-span-2">
+        <div class="card p-4 md:p-6">
+            <div class="border-b border-light-gray pb-3 mb-4 md:pb-4 md:mb-6">
+                <h2 class="text-lg md:text-xl font-medium tracking-tight">Información del libro</h2>
+            </div>
+            
+            <div class="space-y-4 md:space-y-5">
+                <!-- Información básica -->
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-4">
+                    <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Título</p>
+                        <p class="break-words">{{ book.title }}</p>
+                    </div>
+                    <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Autor</p>
+                        <p class="break-words">{{ book.author }}</p>
+                    </div>
+                    <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">ISBN</p>
+                        <p>{{ book.isbn|default:"No especificado" }}</p>
+                    </div>
+                </div>
+                
+                <!-- Información adicional -->
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-4">
+                    <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Editorial</p>
+                        <p class="break-words">{{ book.publisher|default:"No especificado" }}</p>
+                    </div>
+                    <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Año publicación</p>
+                        <p>{{ book.publication_year|default:"No especificado" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Estado</p>
+                        <p>
+                            {% if book.status == 'disponible' %}
+                                <span class="bg-green-100 text-green-800 py-1 px-2 text-sm rounded">Disponible</span>
+                            {% elif book.status == 'prestado' %}
+                                <span class="bg-blue-100 text-blue-800 py-1 px-2 text-sm rounded">Prestado</span>
+                            {% elif book.status == 'reservado' %}
+                                <span class="bg-yellow-100 text-yellow-800 py-1 px-2 text-sm rounded">Reservado</span>
+                            {% elif book.status == 'en reparación' %}
+                                <span class="bg-orange-100 text-orange-800 py-1 px-2 text-sm rounded">En reparación</span>
+                            {% elif book.status == 'extraviado' %}
+                                <span class="bg-red-100 text-red-800 py-1 px-2 text-sm rounded">Extraviado</span>
+                            {% else %}
+                                <span class="bg-black text-white py-1 px-2 text-sm">{{ book.status }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columna lateral para códigos y ubicación -->
+    <div>
+        <!-- Sección de código Dewey -->
+        <div class="card p-4 md:p-6 mb-4 md:mb-6">
+            <div class="border-b border-light-gray pb-3 mb-4 md:pb-4 md:mb-6">
+                <h2 class="text-lg md:text-xl font-medium tracking-tight">Clasificación Dewey</h2>
+            </div>
+            
+            {% if book.dewey_code %}
+                <div class="flex items-center mb-3">
+                    <span class="bg-black text-white py-1 px-2 md:py-2 md:px-3 text-base md:text-lg font-medium mr-3">{{ book.dewey_code.code }}</span>
+                    <a href="{% url 'dewey_update' book.dewey_code.pk %}" class="text-sm text-gray hover:text-black">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </div>
+                <p class="text-sm md:text-base">{{ book.dewey_code.description }}</p>
+            {% else %}
+                <p class="text-gray italic text-sm md:text-base">No tiene código Dewey asignado</p>
+            {% endif %}
+        </div>
+        
+        <!-- Sección de ubicación -->
+        <div class="card p-4 md:p-6">
+            <div class="border-b border-light-gray pb-3 mb-4 md:pb-4 md:mb-6">
+                <h2 class="text-lg md:text-xl font-medium tracking-tight">Ubicación</h2>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                    <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Estantería</p>
+                    <p>{{ book.location|default:"No especificada" }}</p>
+                </div>
+                
+                <div class="border-b pb-3 md:border-b-0 md:pb-0">
+                    <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Fecha de ingreso</p>
+                    <p>{{ book.date_added|date:"d/m/Y" }}</p>
+                </div>
+                
+                <div>
+                    <p class="text-xs md:text-sm uppercase tracking-wide font-medium text-gray mb-1">Última modificación</p>
+                    <p>{{ book.date_modified|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block title %}Códigos Dewey - Biblioteca BCF{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-center">
+    <h1 class="text-3xl font-medium tracking-tight mb-4 md:mb-0">CÓDIGOS DEWEY</h1>
+    <a href="{% url 'dewey_create' %}" class="btn btn-primary inline-flex items-center">
+        <i class="fas fa-plus mr-2"></i> AGREGAR CÓDIGO
+    </a>
+</div>
+
+<!-- Versión para escritorio -->
+<div class="hidden md:block overflow-x-auto">
+    <table id="deweyTable" class="w-full mt-8 display">
+        <thead>
+            <tr>
+                <th class="w-1/4">CÓDIGO</th>
+                <th class="w-3/4">DESCRIPCIÓN</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Los datos se cargarán desde el servidor -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Versión para móvil -->
+<div class="md:hidden mt-4">
+    <!-- Controles de búsqueda y paginación para móvil -->
+    <div class="mb-5 card p-4">
+        <div class="mb-3">
+            <label for="mobileDeweySearch" class="block text-sm font-medium text-gray mb-1">Buscar:</label>
+            <div class="relative">
+                <input id="mobileDeweySearch" type="text" class="w-full py-2 px-4 pr-10 border border-black rounded-md" placeholder="Buscar códigos...">
+                <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <i class="fas fa-search text-gray"></i>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <label for="mobileDeweyLimit" class="block text-sm font-medium text-gray mb-1">Mostrar:</label>
+                <select id="mobileDeweyLimit" class="py-1 px-2 border border-black rounded-md">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div id="mobileDeweyInfo" class="text-sm text-gray">
+                <!-- Info se actualizará vía JS -->
+                Cargando...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lista de códigos Dewey para móvil -->
+    <div id="mobileDeweyList" class="space-y-3">
+        <!-- Los datos para móvil se cargarán con JavaScript -->
+        <div class="text-center py-4">
+            <i class="fas fa-spinner fa-spin text-2xl"></i>
+            <p class="mt-2">Cargando códigos Dewey...</p>
+        </div>
+    </div>
+    
+    <!-- Paginación móvil -->
+    <div class="mt-5 flex flex-col items-center">
+        <div class="flex justify-center items-center gap-2 mb-3">
+            <button id="mobileDeweyFirst" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-double-left"></i>
+            </button>
+            <button id="mobileDeweyPrev" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-left"></i>
+            </button>
+            <span id="mobileDeweyCurrentPage" class="px-3 py-2 bg-black text-white rounded-md">1</span>
+            <button id="mobileDeweyNext" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-right"></i>
+            </button>
+            <button id="mobileDeweyLast" class="py-2 px-3 border border-light-gray rounded-md hover:bg-light-gray disabled:opacity-50">
+                <i class="fas fa-angle-double-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        var currentDeweyPage = 0;
+        var totalDeweyPages = 0;
+        var deweySearchTerm = '';
+        var deweyLimit = 10;
+        var deweyData = [];
+        var totalDeweyRecords = 0;
+        var filteredDeweyRecords = 0;
+        
+        // Inicializar DataTables con carga asíncrona
+        var table = $('#deweyTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: "{% url 'dewey_api' %}",
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-3x"></i><div class="mt-2">Cargando...</div>'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            order: [[0, 'asc']],
+            columns: [
+                { 
+                    data: 'code',
+                    render: function(data, type, row) {
+                        if (type === 'display') {
+                            return '<a href="' + row.url + '" class="font-medium hover:underline">' + data + '</a>';
+                        }
+                        return data;
+                    }
+                },
+                { data: 'description' }
+            ],
+            drawCallback: function(settings) {
+                // Actualizar vista móvil con datos
+                updateDeweyMobileView(settings.json);
+            }
+        });
+        
+        // Función para actualizar la vista móvil con los datos recibidos
+        function updateDeweyMobileView(json) {
+            deweyData = json.data;
+            totalDeweyRecords = json.recordsTotal;
+            filteredDeweyRecords = json.recordsFiltered;
+            totalDeweyPages = Math.ceil(filteredDeweyRecords / deweyLimit);
+            
+            // Actualizar información de registros
+            updateDeweyMobileInfo();
+            
+            // Actualizar la paginación
+            updateDeweyMobilePagination();
+            
+            // Renderizar las tarjetas
+            renderDeweyMobileCards();
+        }
+        
+        // Función para actualizar información de registros
+        function updateDeweyMobileInfo() {
+            var start = currentDeweyPage * deweyLimit + 1;
+            var end = Math.min((currentDeweyPage + 1) * deweyLimit, filteredDeweyRecords);
+            
+            if (filteredDeweyRecords === 0) {
+                start = 0;
+                end = 0;
+            }
+            
+            $('#mobileDeweyInfo').text('Mostrando ' + start + ' a ' + end + ' de ' + filteredDeweyRecords + ' registros');
+        }
+        
+        // Función para actualizar los controles de paginación
+        function updateDeweyMobilePagination() {
+            $('#mobileDeweyCurrentPage').text(currentDeweyPage + 1);
+            
+            // Habilitar/deshabilitar botones según la página actual
+            $('#mobileDeweyFirst, #mobileDeweyPrev').prop('disabled', currentDeweyPage === 0);
+            $('#mobileDeweyNext, #mobileDeweyLast').prop('disabled', currentDeweyPage >= totalDeweyPages - 1 || totalDeweyPages === 0);
+        }
+        
+        // Función para renderizar tarjetas móviles
+        function renderDeweyMobileCards() {
+            var mobileList = $('#mobileDeweyList');
+            mobileList.empty();
+            
+            if (deweyData.length === 0) {
+                mobileList.html('<div class="card p-4"><p class="text-center">No se encontraron códigos Dewey.</p></div>');
+                return;
+            }
+            
+            $.each(deweyData, function(i, dewey) {
+                var card = $('<a>').attr('href', dewey.url).addClass('block');
+                var cardContent = $('<div>').addClass('card p-4 hover:shadow-md transition-shadow duration-200 mb-3');
+                
+                var headerDiv = $('<div>').addClass('flex justify-between items-center mb-2');
+                headerDiv.append($('<span>').addClass('bg-black text-white px-3 py-1').text(dewey.code));
+                headerDiv.append($('<span>').addClass('text-black text-xs').html('<i class="fas fa-edit"></i> Editar'));
+                
+                cardContent.append(headerDiv);
+                cardContent.append($('<p>').addClass('text-gray').text(dewey.description));
+                
+                card.append(cardContent);
+                mobileList.append(card);
+            });
+        }
+        
+        // Eventos para controles móviles
+        $('#mobileDeweySearch').on('keyup', function(e) {
+            deweySearchTerm = $(this).val();
+            currentDeweyPage = 0; // Resetear a primera página
+            
+            // Si se presiona Enter, forzar búsqueda
+            if (e.keyCode === 13) {
+                loadDeweyMobileData();
+            }
+            
+            // Si se borra todo, también buscar
+            if (deweySearchTerm === '') {
+                loadDeweyMobileData();
+            }
+            
+            // Debounce para no hacer muchas peticiones
+            clearTimeout($(this).data('timer'));
+            $(this).data('timer', setTimeout(function() {
+                loadDeweyMobileData();
+            }, 500));
+        });
+        
+        $('#mobileDeweyLimit').on('change', function() {
+            deweyLimit = parseInt($(this).val());
+            currentDeweyPage = 0; // Resetear a primera página
+            loadDeweyMobileData();
+        });
+        
+        // Botones de paginación
+        $('#mobileDeweyFirst').on('click', function() {
+            if (currentDeweyPage > 0) {
+                currentDeweyPage = 0;
+                loadDeweyMobileData();
+            }
+        });
+        
+        $('#mobileDeweyPrev').on('click', function() {
+            if (currentDeweyPage > 0) {
+                currentDeweyPage--;
+                loadDeweyMobileData();
+            }
+        });
+        
+        $('#mobileDeweyNext').on('click', function() {
+            if (currentDeweyPage < totalDeweyPages - 1) {
+                currentDeweyPage++;
+                loadDeweyMobileData();
+            }
+        });
+        
+        $('#mobileDeweyLast').on('click', function() {
+            if (currentDeweyPage < totalDeweyPages - 1) {
+                currentDeweyPage = totalDeweyPages - 1;
+                loadDeweyMobileData();
+            }
+        });
+        
+        // Función para cargar datos en móvil
+        function loadDeweyMobileData() {
+            var mobileList = $('#mobileDeweyList');
+            
+            // Mostrar spinner de carga
+            mobileList.html('<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="mt-2">Cargando códigos Dewey...</p></div>');
+            
+            // Hacer petición a API
+            $.ajax({
+                url: "{% url 'dewey_api' %}",
+                data: {
+                    draw: new Date().getTime(),
+                    start: currentDeweyPage * deweyLimit,
+                    length: deweyLimit,
+                    'search[value]': deweySearchTerm,
+                    order: JSON.stringify([{ column: 0, dir: 'asc' }])
+                },
+                dataType: 'json',
+                success: function(json) {
+                    updateDeweyMobileView(json);
+                },
+                error: function() {
+                    mobileList.html('<div class="card p-4"><p class="text-center text-red-600">Error al cargar los datos. Intente nuevamente.</p></div>');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %} 
