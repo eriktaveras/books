@@ -9,26 +9,92 @@
         <h1 class="text-3xl md:text-5xl font-medium tracking-tight mb-3 md:mb-4">BIBLIOTECA BCF</h1>
         <p class="text-gray-300 text-base md:text-xl max-w-2xl mb-6">Sistema de gestión bibliotecaria con una extensa colección de títulos académicos y literarios</p>
         
-        <!-- Buscador destacado -->
-        <form action="{% url 'book_list' %}" method="get" class="max-w-xl">
-            <div class="flex flex-col md:flex-row gap-3">
-                <div class="relative flex-grow">
-                    <input type="text" 
-                           name="query" 
-                           placeholder="Buscar por título, autor, ISBN..." 
-                           class="w-full py-3 px-5 pr-10 text-black border-none rounded-lg focus:ring-2 focus:ring-gray-400"
-                           autocomplete="off"
-                           autofocus>
-                    <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <i class="fas fa-search text-gray"></i>
+        <!-- Buscador destacado mejorado -->
+        <div class="max-w-xl">
+            <form id="searchForm" action="{% url 'book_list' %}" method="get" class="mb-2">
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="relative flex-grow">
+                        <input 
+                            type="text" 
+                            id="mainSearchInput"
+                            name="query" 
+                            placeholder="Buscar por título, autor, ISBN..." 
+                            class="w-full py-3 px-5 pr-10 text-black border-none rounded-lg focus:ring-2 focus:ring-gray-400"
+                            autocomplete="off"
+                            autofocus
+                        >
+                        <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <i class="fas fa-search text-gray"></i>
+                        </div>
+                        
+                        <!-- Autocomplete dropdown (oculto por defecto) -->
+                        <div id="searchSuggestions" class="hidden absolute left-0 right-0 mt-1 bg-white shadow-lg rounded-md z-50 max-h-60 overflow-y-auto">
+                            <!-- Las sugerencias se cargarán dinámicamente -->
+                        </div>
+                    </div>
+                    <input type="hidden" name="field" id="searchField" value="all">
+                    <button type="submit" class="btn bg-white text-black hover:bg-light-gray rounded-lg py-3 px-6 font-medium">
+                        BUSCAR
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Opciones avanzadas de búsqueda -->
+            <div class="flex flex-wrap gap-2 mb-3 text-sm">
+                <button id="searchFilterToggle" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md inline-flex items-center transition-colors">
+                    <i class="fas fa-sliders-h mr-2"></i> Filtros
+                </button>
+                
+                <!-- Búsquedas rápidas -->
+                <a href="{% url 'book_list' %}?field=status&query=disponible" class="bg-green-800 hover:bg-green-700 text-white px-3 py-1 rounded-md inline-flex items-center transition-colors">
+                    <i class="fas fa-check-circle mr-1"></i> Disponibles
+                </a>
+                <a href="{% url 'book_list' %}?field=status&query=prestado" class="bg-blue-800 hover:bg-blue-700 text-white px-3 py-1 rounded-md inline-flex items-center transition-colors">
+                    <i class="fas fa-user-clock mr-1"></i> Prestados
+                </a>
+            </div>
+            
+            <!-- Panel de búsqueda avanzada (oculto por defecto) -->
+            <div id="advancedSearchPanel" class="hidden bg-gray-700 rounded-lg p-4 mb-4 text-white">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Campo de búsqueda</label>
+                        <select id="fieldSelector" class="w-full bg-gray-800 border-gray-600 rounded text-white py-2 px-3 text-sm">
+                            <option value="all">Todos los campos</option>
+                            <option value="title">Título</option>
+                            <option value="author">Autor</option>
+                            <option value="dewey_code">Código Dewey</option>
+                            <option value="isbn">ISBN</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Estado</label>
+                        <select id="statusSelector" class="w-full bg-gray-800 border-gray-600 rounded text-white py-2 px-3 text-sm">
+                            <option value="">Cualquiera</option>
+                            <option value="disponible">Disponible</option>
+                            <option value="prestado">Prestado</option>
+                            <option value="reservado">Reservado</option>
+                            <option value="en reparación">En reparación</option>
+                            <option value="extraviado">Extraviado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Ordenar por</label>
+                        <select id="sortSelector" class="w-full bg-gray-800 border-gray-600 rounded text-white py-2 px-3 text-sm">
+                            <option value="title">Título (A-Z)</option>
+                            <option value="title_desc">Título (Z-A)</option>
+                            <option value="author">Autor (A-Z)</option>
+                            <option value="recent">Más recientes</option>
+                        </select>
                     </div>
                 </div>
-                <input type="hidden" name="field" value="all">
-                <button type="submit" class="btn bg-white text-black hover:bg-light-gray rounded-lg py-3 px-6 font-medium">
-                    BUSCAR
-                </button>
+                <div class="text-right">
+                    <button id="applyAdvancedSearch" class="bg-white text-black hover:bg-light-gray rounded px-4 py-1 text-sm font-medium transition-colors">
+                        Aplicar filtros
+                    </button>
+                </div>
             </div>
-        </form>
+        </div>
     </div>
     <!-- Patrón decorativo de fondo -->
     <div class="absolute top-0 right-0 w-full h-full opacity-10 overflow-hidden">
@@ -58,6 +124,34 @@
     <div class="bg-light-gray rounded-lg p-4 md:p-6 text-center">
         <div class="text-2xl md:text-4xl font-bold mb-1">{{ updated_date|default:"2023" }}</div>
         <div class="text-xs md:text-sm uppercase tracking-wide text-gray">Actualizado</div>
+    </div>
+</div>
+
+<!-- Búsquedas recientes o populares -->
+<div class="mb-8">
+    <h2 class="text-lg font-medium mb-3">Búsquedas populares</h2>
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'book_list' %}?query=matemáticas" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Matemáticas
+        </a>
+        <a href="{% url 'book_list' %}?query=literatura" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Literatura
+        </a>
+        <a href="{% url 'book_list' %}?query=física" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Física
+        </a>
+        <a href="{% url 'book_list' %}?query=historia" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Historia
+        </a>
+        <a href="{% url 'book_list' %}?query=química" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Química
+        </a>
+        <a href="{% url 'book_list' %}?query=biología" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Biología
+        </a>
+        <a href="{% url 'book_list' %}?query=programación" class="bg-light-gray hover:bg-gray px-3 py-1 rounded-full text-sm transition-colors">
+            Programación
+        </a>
     </div>
 </div>
 
@@ -128,4 +222,148 @@
         </div>
     </a>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Manejo del panel de búsqueda avanzada
+    $("#searchFilterToggle").on("click", function() {
+        $("#advancedSearchPanel").toggleClass("hidden");
+    });
+    
+    // Guardar búsquedas recientes en localStorage
+    function saveRecentSearch(query) {
+        if (!query) return;
+        
+        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+        
+        // Evitar duplicados
+        if (!recentSearches.includes(query)) {
+            recentSearches.unshift(query);
+            
+            // Limitar a 5 búsquedas recientes
+            if (recentSearches.length > 5) {
+                recentSearches = recentSearches.slice(0, 5);
+            }
+            
+            localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
+        }
+    }
+    
+    // Manejar el envío del formulario de búsqueda
+    $("#searchForm").on("submit", function(e) {
+        const query = $("#mainSearchInput").val().trim();
+        if (query) {
+            saveRecentSearch(query);
+        }
+    });
+    
+    // Sugerencias de autocompletado
+    let searchTimeout;
+    $("#mainSearchInput").on("keyup", function() {
+        const query = $(this).val().trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            $("#searchSuggestions").addClass("hidden");
+            return;
+        }
+        
+        searchTimeout = setTimeout(function() {
+            // Aquí se implementaría la llamada a la API para obtener sugerencias
+            // Por ahora, mostraremos algunas sugerencias de ejemplo
+            
+            const recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+            const filteredRecent = recentSearches.filter(item => 
+                item.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            // Ejemplo de títulos de libros populares que coincidan con la búsqueda
+            const popularTitles = [
+                "Cien años de soledad", 
+                "Don Quijote de la Mancha",
+                "Matemáticas avanzadas",
+                "Historia universal",
+                "Física cuántica"
+            ];
+            
+            const matchedTitles = popularTitles.filter(title => 
+                title.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            // Mostrar sugerencias
+            let suggestionsHTML = '';
+            
+            // Primero mostrar búsquedas recientes
+            if (filteredRecent.length > 0) {
+                suggestionsHTML += '<div class="px-3 py-2 text-xs text-gray-500 font-medium">Búsquedas recientes</div>';
+                filteredRecent.forEach(term => {
+                    suggestionsHTML += `
+                        <a href="{% url 'book_list' %}?query=${encodeURIComponent(term)}" class="block px-4 py-2 hover:bg-light-gray border-t border-light-gray">
+                            <div class="flex items-center">
+                                <i class="fas fa-history text-gray mr-3"></i>
+                                <span>${term}</span>
+                            </div>
+                        </a>
+                    `;
+                });
+            }
+            
+            // Luego mostrar coincidencias de títulos
+            if (matchedTitles.length > 0) {
+                suggestionsHTML += '<div class="px-3 py-2 text-xs text-gray-500 font-medium border-t border-light-gray">Sugerencias</div>';
+                matchedTitles.forEach(title => {
+                    suggestionsHTML += `
+                        <a href="{% url 'book_list' %}?query=${encodeURIComponent(title)}" class="block px-4 py-2 hover:bg-light-gray border-t border-light-gray">
+                            <div class="flex items-center">
+                                <i class="fas fa-book text-gray mr-3"></i>
+                                <span>${title}</span>
+                            </div>
+                        </a>
+                    `;
+                });
+            }
+            
+            if (suggestionsHTML) {
+                $("#searchSuggestions").html(suggestionsHTML).removeClass("hidden");
+            } else {
+                $("#searchSuggestions").addClass("hidden");
+            }
+        }, 300);
+    });
+    
+    // Ocultar sugerencias al hacer clic fuera
+    $(document).on("click", function(e) {
+        if (!$(e.target).closest("#mainSearchInput, #searchSuggestions").length) {
+            $("#searchSuggestions").addClass("hidden");
+        }
+    });
+    
+    // Manejar búsqueda avanzada
+    $("#applyAdvancedSearch").on("click", function() {
+        const field = $("#fieldSelector").val();
+        const status = $("#statusSelector").val();
+        const sort = $("#sortSelector").val();
+        const query = $("#mainSearchInput").val().trim();
+        
+        // Construir URL con parámetros
+        let url = "{% url 'book_list' %}?";
+        let params = [];
+        
+        if (query) params.push(`query=${encodeURIComponent(query)}`);
+        if (field && field !== 'all') params.push(`field=${encodeURIComponent(field)}`);
+        if (status) params.push(`status=${encodeURIComponent(status)}`);
+        if (sort) params.push(`sort=${encodeURIComponent(sort)}`);
+        
+        window.location.href = url + params.join('&');
+    });
+    
+    // Actualizar campo oculto al cambiar el selector de campo
+    $("#fieldSelector").on("change", function() {
+        $("#searchField").val($(this).val());
+    });
+});
+</script>
 {% endblock %} 
